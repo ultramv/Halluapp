@@ -6,11 +6,13 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
+    return Inertia::render('Welcome/index', [
+        'appInfo' => [
+            'canLogin' => Route::has('login'),
+            'canRegister' => Route::has('register'),
+            'laravelVersion' => Application::VERSION,
+            'phpVersion' => PHP_VERSION,
+        ],
     ]);
 })->name('welcome');
 
@@ -23,5 +25,21 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
+
+Route::get('/categories/{category}', function (int $category) {
+    // Get the categories data from the JSON file
+    $categoriesData = json_decode(file_get_contents(base_path('json/welcomepagedata.json')), true);
+    
+    // Find the requested category
+    $selectedCategory = collect($categoriesData['categories'])->firstWhere('category_id', $category);
+    
+    if (!$selectedCategory) {
+        abort(404);
+    }
+
+    return Inertia::render('SubCategories/Index', [
+        'category' => $selectedCategory
+    ]);
+})->name('categories.show');
 
 require __DIR__.'/auth.php';

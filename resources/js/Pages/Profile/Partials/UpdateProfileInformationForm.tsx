@@ -21,7 +21,7 @@ export default function UpdateProfileInformation({
         useForm({
             name: usePage().props.auth.user?.name ?? '',
             email: usePage().props.auth.user?.email ?? '',
-            emailVerifiedAt: usePage().props.auth.user?.emailVerifiedAt ?? null,
+            email_verified_at: usePage().props.auth.user?.email_verified_at ?? null,
         });
 
     const submit: FormEventHandler = (e) => {

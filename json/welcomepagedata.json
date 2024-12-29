@@ -1,0 +1,93 @@
+{
+    "categories": [
+      {
+        "category_id": 1,
+        "name": "Home Services",
+        "image_url": "https://example.com/images/home_services.jpg",
+        "subcategories": [
+          {
+            "subcategory_id": 1,
+            "name": "Plumbing",
+            "image_url": "https://example.com/images/plumbing.jpg"
+          },
+          {
+            "subcategory_id": 2,
+            "name": "Electrical",
+            "image_url": "https://example.com/images/electrical.jpg"
+          },
+          {
+            "subcategory_id": 3,
+            "name": "Cleaning",
+            "image_url": "https://example.com/images/cleaning.jpg"
+          }
+        ]
+      },
+      {
+        "category_id": 2,
+        "name": "Event Services",
+        "image_url": "https://example.com/images/event_services.jpg",
+        "subcategories": [
+          {
+            "subcategory_id": 4,
+            "name": "Photography",
+            "image_url": "https://example.com/images/photography.jpg"
+          },
+          {
+            "subcategory_id": 5,
+            "name": "Catering",
+            "image_url": "https://example.com/images/catering.jpg"
+          },
+          {
+            "subcategory_id": 6,
+            "name": "Event Planning",
+            "image_url": "https://example.com/images/event_planning.jpg"
+          }
+        ]
+      },
+      {
+        "category_id": 3,
+        "name": "Equipment Rentals",
+        "image_url": "https://example.com/images/equipment_rentals.jpg",
+        "subcategories": [
+          {
+            "subcategory_id": 7,
+            "name": "Photography Equipment",
+            "image_url": "https://example.com/images/photography_equipment.jpg"
+          },
+          {
+            "subcategory_id": 8,
+            "name": "Event Equipment",
+            "image_url": "https://example.com/images/event_equipment.jpg"
+          },
+          {
+            "subcategory_id": 9,
+            "name": "Tools & Machinery",
+            "image_url": "https://example.com/images/tools_machinery.jpg"
+          }
+        ]
+      },
+      {
+        "category_id": 4,
+        "name": "Personal Services",
+        "image_url": "https://example.com/images/personal_services.jpg",
+        "subcategories": [
+          {
+            "subcategory_id": 10,
+            "name": "Fitness Training",
+            "image_url": "https://example.com/images/fitness_training.jpg"
+          },
+          {
+            "subcategory_id": 11,
+            "name": "Beauty & Wellness",
+            "image_url": "https://example.com/images/beauty_wellness.jpg"
+          },
+          {
+            "subcategory_id": 12,
+            "name": "Life Coaching",
+            "image_url": "https://example.com/images/life_coaching.jpg"
+          }
+        ]
+      }
+    ]
+  }
+  
