@@ -6,10 +6,9 @@ import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { signInWithEmail, signInWithGoogle } from '@/config/firebase';
+import { signInWithEmail, signInWithGoogle, getGoogleRedirectResult } from '@/config/firebase';
 import axios from 'axios';
 import { router } from '@inertiajs/react';
-import { getAuth, getRedirectResult } from 'firebase/auth';
 
 export default function Login({ status, canResetPassword }: { status?: string, canResetPassword: boolean }) {
     const { data, setData, setError, processing, errors } = useForm({
@@ -21,10 +20,9 @@ export default function Login({ status, canResetPassword }: { status?: string, c
     useEffect(() => {
         const checkRedirectResult = async () => {
             try {
-                const auth = getAuth();
-                const result = await getRedirectResult(auth);
-                if (result?.user) {
-                    await handleFirebaseAuth(result.user);
+                const user = await getGoogleRedirectResult();
+                if (user) {
+                    await handleFirebaseAuth(user);
                 }
             } catch (error) {
                 console.error('Error checking redirect result:', error);

@@ -15,11 +15,14 @@ const firebaseConfig = {
     appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
-// Initialize Firebase with persistence
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-auth.setPersistence(browserLocalPersistence);
 const googleProvider = new GoogleAuthProvider();
+
+// Configure Google provider
+googleProvider.addScope('profile');
+googleProvider.addScope('email');
 googleProvider.setCustomParameters({
     prompt: 'select_account'
 });
@@ -27,13 +30,18 @@ googleProvider.setCustomParameters({
 export const signInWithGoogle = async () => {
     try {
         await signInWithRedirect(auth, googleProvider);
-        const result = await getRedirectResult(auth);
-        if (result) {
-            return result.user;
-        }
-        throw new Error('No redirect result');
     } catch (error) {
         console.error('Error signing in with Google:', error);
+        throw error;
+    }
+};
+
+export const getGoogleRedirectResult = async () => {
+    try {
+        const result = await getRedirectResult(auth);
+        return result?.user;
+    } catch (error) {
+        console.error('Error getting redirect result:', error);
         throw error;
     }
 };
