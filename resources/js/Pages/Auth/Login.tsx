@@ -6,7 +6,8 @@ import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { signInWithEmail, signInWithGoogle, getGoogleRedirectResult } from '@/config/firebase';
+import { auth } from '@/config/firebase';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import axios from 'axios';
 import { router } from '@inertiajs/react';
 
@@ -17,69 +18,38 @@ export default function Login({ status, canResetPassword }: { status?: string, c
         remember: false,
     });
 
-    useEffect(() => {
-        const checkRedirectResult = async () => {
-            try {
-                const user = await getGoogleRedirectResult();
-                if (user) {
-                    await handleFirebaseAuth(user);
-                }
-            } catch (error) {
-                console.error('Error checking redirect result:', error);
-                setError('email' as any, 'Google sign-in failed. Please try again.');
-            }
-        };
-
-        checkRedirectResult();
-    }, []);
-
-    const handleFirebaseAuth = async (firebaseUser: any) => {
-        try {
-            const token = await firebaseUser.getIdToken();
-            const response = await axios.post('/auth/firebase', {
-                email: firebaseUser.email,
-                name: firebaseUser.displayName || '',
-                firebase_uid: firebaseUser.uid,
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (response.data.user) {
-                router.visit('/dashboard');
-            }
-        } catch (error: any) {
-            if (error.response?.data?.errors) {
-                Object.keys(error.response.data.errors).forEach((key) => {
-                    setError(key as any, error.response.data.errors[key][0]);
-                });
-            } else {
-                setError('email' as any, 'Login failed. Please try again.');
-            }
-        }
-    };
+    const googleProvider = new GoogleAuthProvider();
+    googleProvider.addScope('profile');
+    googleProvider.addScope('email');
+    googleProvider.setCustomParameters({
+        prompt: 'select_account'
+    });
 
     const handleEmailLogin: FormEventHandler = async (e) => {
         e.preventDefault();
-
+        
         try {
-            const firebaseUser = await signInWithEmail(data.email, data.password);
-            await handleFirebaseAuth(firebaseUser);
+            const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+            const token = await userCredential.user.getIdToken(true);
+            await axios.post('/firebase-login', { token });
+            router.visit('/dashboard');
         } catch (error: any) {
             if (error.code === 'auth/invalid-credential') {
-                setError('email' as any, 'Invalid email or password.');
+                setError('email', 'Invalid email or password.');
             } else {
-                setError('email' as any, 'Login failed. Please try again.');
+                setError('email', 'Login failed. Please try again.');
             }
         }
     };
 
     const handleGoogleLogin = async () => {
         try {
-            await signInWithGoogle();
+            const result = await signInWithPopup(auth, googleProvider);
+            const token = await result.user.getIdToken(true);
+            await axios.post('/firebase-login', { token });
+            router.visit('/dashboard');
         } catch (error) {
-            setError('email' as any, 'Google sign-in failed. Please try again.');
+            setError('email', 'Google sign-in failed. Please try again.');
         }
     };
 

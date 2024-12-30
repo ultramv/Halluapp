@@ -1,11 +1,12 @@
-import { useEffect, FormEventHandler } from 'react';
+import { FormEventHandler } from 'react';
+import GuestLayout from '@/Layouts/GuestLayout';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
-import GuestLayout from '@/Layouts/GuestLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { signUpWithEmail, signInWithGoogle, getGoogleRedirectResult } from '@/config/firebase';
+import { auth } from '@/config/firebase';
+import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import axios from 'axios';
 import { router } from '@inertiajs/react';
 
@@ -17,74 +18,43 @@ export default function Register() {
         password_confirmation: '',
     });
 
-    useEffect(() => {
-        const checkRedirectResult = async () => {
-            try {
-                const user = await getGoogleRedirectResult();
-                if (user) {
-                    await handleFirebaseAuth(user);
-                }
-            } catch (error) {
-                console.error('Error checking redirect result:', error);
-                setError('email' as any, 'Google sign-up failed. Please try again.');
-            }
-        };
-
-        checkRedirectResult();
-    }, []);
-
-    const handleFirebaseAuth = async (firebaseUser: any) => {
-        try {
-            const token = await firebaseUser.getIdToken();
-            const response = await axios.post('/auth/firebase', {
-                email: firebaseUser.email,
-                name: firebaseUser.displayName || data.name,
-                firebase_uid: firebaseUser.uid,
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (response.data.user) {
-                router.visit('/dashboard');
-            }
-        } catch (error: any) {
-            if (error.response?.data?.errors) {
-                Object.keys(error.response.data.errors).forEach((key) => {
-                    setError(key as any, error.response.data.errors[key][0]);
-                });
-            } else {
-                setError('email' as any, 'Registration failed. Please try again.');
-            }
-        }
-    };
+    const googleProvider = new GoogleAuthProvider();
+    googleProvider.addScope('profile');
+    googleProvider.addScope('email');
+    googleProvider.setCustomParameters({
+        prompt: 'select_account'
+    });
 
     const handleEmailRegister: FormEventHandler = async (e) => {
         e.preventDefault();
         
         if (data.password !== data.password_confirmation) {
-            setError('password_confirmation' as any, 'The password confirmation does not match.');
+            setError('password_confirmation', 'The password confirmation does not match.');
             return;
         }
 
         try {
-            const firebaseUser = await signUpWithEmail(data.email, data.password);
-            await handleFirebaseAuth(firebaseUser);
+            const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+            const token = await userCredential.user.getIdToken(true);
+            await axios.post('/firebase-login', { token });
+            router.visit('/dashboard');
         } catch (error: any) {
             if (error.code === 'auth/email-already-in-use') {
-                setError('email' as any, 'This email is already registered.');
+                setError('email', 'This email is already registered.');
             } else {
-                setError('email' as any, 'Registration failed. Please try again.');
+                setError('email', 'Registration failed. Please try again.');
             }
         }
     };
 
     const handleGoogleRegister = async () => {
         try {
-            await signInWithGoogle();
+            const result = await signInWithPopup(auth, googleProvider);
+            const token = await result.user.getIdToken(true);
+            await axios.post('/firebase-login', { token });
+            router.visit('/dashboard');
         } catch (error) {
-            setError('email' as any, 'Google sign-up failed. Please try again.');
+            setError('email', 'Google sign-up failed. Please try again.');
         }
     };
 

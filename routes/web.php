@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use App\Models\User;
+use App\Http\Controllers\AuthController;
 
 Route::get('/', function () {
     return Inertia::render('Welcome/index', [
@@ -116,5 +117,7 @@ Route::post('/auth/firebase', function (Request $request) {
         ], 500);
     }
 })->middleware(['web']);
+
+Route::post('/firebase-login', [App\Http\Controllers\Auth\AuthController::class, 'firebaseLogin'])->name('firebase.login');
 
 require __DIR__.'/auth.php';
