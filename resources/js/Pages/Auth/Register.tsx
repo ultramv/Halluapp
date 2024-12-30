@@ -35,10 +35,15 @@ export default function Register() {
 
     const handleFirebaseAuth = async (firebaseUser: any) => {
         try {
+            const token = await firebaseUser.getIdToken();
             const response = await axios.post('/auth/firebase', {
                 email: firebaseUser.email,
                 name: firebaseUser.displayName || data.name,
                 firebase_uid: firebaseUser.uid,
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
             });
 
             if (response.data.user) {
@@ -77,10 +82,7 @@ export default function Register() {
 
     const handleGoogleRegister = async () => {
         try {
-            const firebaseUser = await signInWithGoogle();
-            if (firebaseUser) {
-                await handleFirebaseAuth(firebaseUser);
-            }
+            await signInWithGoogle();
         } catch (error) {
             setError('email' as any, 'Google sign-up failed. Please try again.');
         }

@@ -56,6 +56,12 @@ Route::post('/auth/firebase', function (Request $request) {
             'firebase_uid' => 'required|string',
         ]);
 
+        // Get the Firebase token from the Authorization header
+        $token = str_replace('Bearer ', '', $request->header('Authorization'));
+        if (!$token) {
+            throw new \Exception('No Firebase token provided');
+        }
+
         \Log::info('Firebase auth attempt', [
             'email' => $validated['email'],
             'firebase_uid' => $validated['firebase_uid']

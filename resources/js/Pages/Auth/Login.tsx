@@ -35,10 +35,15 @@ export default function Login({ status, canResetPassword }: { status?: string, c
 
     const handleFirebaseAuth = async (firebaseUser: any) => {
         try {
+            const token = await firebaseUser.getIdToken();
             const response = await axios.post('/auth/firebase', {
                 email: firebaseUser.email,
                 name: firebaseUser.displayName || '',
                 firebase_uid: firebaseUser.uid,
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
             });
 
             if (response.data.user) {
@@ -72,10 +77,7 @@ export default function Login({ status, canResetPassword }: { status?: string, c
 
     const handleGoogleLogin = async () => {
         try {
-            const firebaseUser = await signInWithGoogle();
-            if (firebaseUser) {
-                await handleFirebaseAuth(firebaseUser);
-            }
+            await signInWithGoogle();
         } catch (error) {
             setError('email' as any, 'Google sign-in failed. Please try again.');
         }

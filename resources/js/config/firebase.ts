@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { getAuth, signInWithRedirect, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, getRedirectResult } from 'firebase/auth';
 import axios from 'axios';
 
 // Configure axios to include CSRF token
@@ -29,18 +29,7 @@ googleProvider.setCustomParameters({
 
 export const signInWithGoogle = async () => {
     try {
-        try {
-            // First try popup
-            const result = await signInWithPopup(auth, googleProvider);
-            return result.user;
-        } catch (error: any) {
-            // If popup is blocked, try redirect
-            if (error.code === 'auth/popup-blocked') {
-                await signInWithRedirect(auth, googleProvider);
-                return null; // Will be handled by getRedirectResult
-            }
-            throw error;
-        }
+        await signInWithRedirect(auth, googleProvider);
     } catch (error) {
         console.error('Error signing in with Google:', error);
         throw error;
