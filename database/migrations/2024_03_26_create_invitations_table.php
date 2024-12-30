@@ -11,8 +11,9 @@ return new class extends Migration
         Schema::create('invitations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('created_by')->constrained('users');
-            $table->string('code')->unique();
+            $table->string('code', 17)->unique();
             $table->string('role_slug');
+            $table->string('redirect_url')->nullable();
             $table->boolean('is_used')->default(false);
             $table->timestamp('expires_at')->nullable();
             $table->timestamps();
@@ -23,4 +24,4 @@ return new class extends Migration
     {
         Schema::dropIfExists('invitations');
     }
-}; 
+};

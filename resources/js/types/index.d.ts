@@ -19,10 +19,12 @@ export interface AppInfo {
     phpVersion: string | null;
 }
 
+export interface Auth {
+    user: User;
+}
+
 export interface PageProps {
-    auth: {
-        user: User | null;
-    };
+    auth: Auth;
     currentRoute?: string;
     appInfo: AppInfo;
 }

@@ -14,6 +14,7 @@ class Invitation extends Model
         'role_slug',
         'is_used',
         'expires_at',
+        'redirect_url',
     ];
 
     protected $casts = [
@@ -29,7 +30,10 @@ class Invitation extends Model
     public static function generateCode(): string
     {
         do {
-            $code = strtoupper(Str::random(8));
+            // Generate a 17-character code: 12 random chars + 5 timestamp-based chars
+            $randomPart = strtoupper(Str::random(12));
+            $timestampPart = strtoupper(base_convert(time() % 100000, 10, 36));
+            $code = $randomPart . str_pad($timestampPart, 5, '0', STR_PAD_LEFT);
         } while (static::where('code', $code)->exists());
 
         return $code;
@@ -46,5 +50,13 @@ class Invitation extends Model
         }
 
         return true;
+    }
+
+    public function getInviteUrl(): string
+    {
+        if ($this->redirect_url) {
+            return $this->redirect_url . '?code=' . $this->code;
+        }
+        return url("/register?code={$this->code}");
     }
 } 
