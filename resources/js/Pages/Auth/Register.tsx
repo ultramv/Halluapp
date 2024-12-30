@@ -77,7 +77,10 @@ export default function Register() {
 
     const handleGoogleRegister = async () => {
         try {
-            await signInWithGoogle();
+            const firebaseUser = await signInWithGoogle();
+            if (firebaseUser) {
+                await handleFirebaseAuth(firebaseUser);
+            }
         } catch (error) {
             setError('email' as any, 'Google sign-up failed. Please try again.');
         }

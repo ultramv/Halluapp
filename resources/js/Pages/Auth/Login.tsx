@@ -72,7 +72,10 @@ export default function Login({ status, canResetPassword }: { status?: string, c
 
     const handleGoogleLogin = async () => {
         try {
-            await signInWithGoogle();
+            const firebaseUser = await signInWithGoogle();
+            if (firebaseUser) {
+                await handleFirebaseAuth(firebaseUser);
+            }
         } catch (error) {
             setError('email' as any, 'Google sign-in failed. Please try again.');
         }
