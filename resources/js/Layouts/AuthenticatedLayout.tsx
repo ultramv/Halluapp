@@ -5,6 +5,7 @@ import NavLink from '@/Components/NavLink';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink';
 import { Link } from '@inertiajs/react';
 import { User } from '@/types';
+import RoleLabel from '@/Components/RoleLabel';
 
 export default function Authenticated({
     user,
@@ -18,6 +19,9 @@ export default function Authenticated({
 }>) {
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);
+
+    const userRole = user.roles?.[0]?.name || 'No Role';
+    const isAdmin = user.roles?.some(role => role.slug === 'admin') || false;
 
     return (
         <div className="min-h-screen bg-gray-100">
@@ -38,6 +42,14 @@ export default function Authenticated({
                                 >
                                     Dashboard
                                 </NavLink>
+                                {isAdmin && (
+                                    <NavLink
+                                        href="/invitations"
+                                        active={currentRoute === 'invitations.index'}
+                                    >
+                                        Invitations
+                                    </NavLink>
+                                )}
                             </div>
                         </div>
 
@@ -50,7 +62,10 @@ export default function Authenticated({
                                                 type="button"
                                                 className="inline-flex items-center rounded-md border border-transparent bg-white px-3 py-2 text-sm font-medium leading-4 text-gray-500 transition duration-150 ease-in-out hover:text-gray-700 focus:outline-none"
                                             >
-                                                {user.name}
+                                                <div className="flex items-center gap-2">
+                                                    <span>{user.name}</span>
+                                                    <RoleLabel role={userRole} />
+                                                </div>
 
                                                 <svg
                                                     className="ms-2 -me-0.5 h-4 w-4"
@@ -140,6 +155,14 @@ export default function Authenticated({
                         >
                             Dashboard
                         </ResponsiveNavLink>
+                        {isAdmin && (
+                            <ResponsiveNavLink
+                                href="/invitations"
+                                active={currentRoute === 'invitations.index'}
+                            >
+                                Invitations
+                            </ResponsiveNavLink>
+                        )}
                     </div>
 
                     <div className="border-t border-gray-200 pb-1 pt-4">
@@ -149,6 +172,9 @@ export default function Authenticated({
                             </div>
                             <div className="text-sm font-medium text-gray-500">
                                 {user.email}
+                            </div>
+                            <div className="mt-2">
+                                <RoleLabel role={userRole} />
                             </div>
                         </div>
 

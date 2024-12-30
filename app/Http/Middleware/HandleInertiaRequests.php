@@ -18,7 +18,7 @@ class HandleInertiaRequests extends Middleware
     /**
      * Determine the current asset version.
      */
-    public function version(Request $request): ?string
+    public function version(Request $request): string|null
     {
         return parent::version($request);
     }
@@ -32,7 +32,7 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
         $isWelcomePage = $request->route()?->getName() === 'welcome';
-        
+
         return [
             ...parent::share($request),
             'auth' => [
@@ -40,6 +40,7 @@ class HandleInertiaRequests extends Middleware
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
+                    'roles' => $user->roles()->get(),
                 ] : null,
             ],
             'currentRoute' => $request->route()?->getName(),

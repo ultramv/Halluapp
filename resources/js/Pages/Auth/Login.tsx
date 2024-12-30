@@ -1,10 +1,7 @@
 import { FormEventHandler, useState } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import { auth } from '@/config/firebase';
 import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, AuthError } from 'firebase/auth';
-import axios, { AxiosError } from 'axios';
-import { router } from '@inertiajs/react';
-
 import GuestLayout from '@/Layouts/GuestLayout';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
@@ -17,10 +14,11 @@ interface LoginFormData {
     remember: boolean;
 }
 
-interface FirebaseLoginResponse {
-    message?: string;
-    user?: any;
-    errors?: Record<string, string[]>;
+type FirebaseAuthData = {
+    [key: string]: string | null;
+    email: string | null;
+    name: string;
+    firebase_uid: string;
 }
 
 export default function Login() {
@@ -61,28 +59,27 @@ export default function Login() {
         }
     };
 
-    const handleBackendError = (error: AxiosError<FirebaseLoginResponse>) => {
-        console.error('Backend error:', error.response?.data);
-        const message = error.response?.data?.message || 
-            error.response?.data?.errors?.token?.[0] || 
-            error.message;
-        setError('email', `Server error: ${message}`);
-    };
-
     const handleEmailLogin: FormEventHandler = async (e) => {
         e.preventDefault();
         setIsLoading(true);
 
         try {
             const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
-            const token = await userCredential.user.getIdToken(true);
+            const user = userCredential.user;
             
-            try {
-                await axios.post('/firebase-login', { token });
-                router.visit('/dashboard');
-            } catch (error) {
-                handleBackendError(error as AxiosError<FirebaseLoginResponse>);
-            }
+            const authData: FirebaseAuthData = {
+                email: user.email,
+                name: user.displayName || user.email?.split('@')[0] || 'Anonymous',
+                firebase_uid: user.uid,
+            };
+
+            router.visit('/firebase-login', {
+                method: 'post',
+                data: authData,
+                onError: () => {
+                    setError('email', 'Authentication failed. Please try again.');
+                }
+            });
         } catch (error) {
             handleFirebaseError(error as AuthError);
         } finally {
@@ -95,14 +92,21 @@ export default function Login() {
 
         try {
             const result = await signInWithPopup(auth, googleProvider);
-            const token = await result.user.getIdToken(true);
+            const user = result.user;
             
-            try {
-                await axios.post('/firebase-login', { token });
-                router.visit('/dashboard');
-            } catch (error) {
-                handleBackendError(error as AxiosError<FirebaseLoginResponse>);
-            }
+            const authData: FirebaseAuthData = {
+                email: user.email,
+                name: user.displayName || user.email?.split('@')[0] || 'Anonymous',
+                firebase_uid: user.uid,
+            };
+
+            router.visit('/firebase-login', {
+                method: 'post',
+                data: authData,
+                onError: () => {
+                    setError('email', 'Authentication failed. Please try again.');
+                }
+            });
         } catch (error) {
             handleFirebaseError(error as AuthError);
         } finally {

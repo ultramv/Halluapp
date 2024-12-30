@@ -1,8 +1,15 @@
+export interface Role {
+    id: number;
+    name: string;
+    slug: string;
+}
+
 export interface User {
     id: number;
     name: string;
     email: string;
     email_verified_at: string | null;
+    roles: Role[];
 }
 
 export interface AppInfo {
