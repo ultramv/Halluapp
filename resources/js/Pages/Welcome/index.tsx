@@ -1,12 +1,23 @@
-import { PageProps } from '@/types';
-import DesktopWelcome from './Desktop';
-import MobileWelcome from './Mobile';
+import Mobile from './Mobile';
+import Desktop from './Desktop';
+import { User } from '@/types';
 
-export default function Welcome(props: PageProps) {
+interface Props {
+    auth: {
+        user: User | null;
+    };
+    currentRoute?: string;
+}
+
+export default function Welcome(props: Props) {
     return (
         <>
-            <MobileWelcome {...props} />
-            <DesktopWelcome {...props} />
+            <div className="block md:hidden">
+                <Mobile authUser={props.auth} currentRoute={props.currentRoute} />
+            </div>
+            <div className="hidden md:block">
+                <Desktop {...props} />
+            </div>
         </>
     );
 } 

@@ -1,204 +1,302 @@
-import { PageProps } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import { useState } from 'react';
+import { FormEventHandler, useState } from 'react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { auth } from '@/config/firebase';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, AuthError } from 'firebase/auth';
+import axios, { AxiosError } from 'axios';
+import { router } from '@inertiajs/react';
+import { User } from '@/types';
+
+import InputError from '@/Components/InputError';
+import InputLabel from '@/Components/InputLabel';
+import PrimaryButton from '@/Components/PrimaryButton';
+import TextInput from '@/Components/TextInput';
+
+interface LoginFormData {
+    email: string;
+    password: string;
+    remember: boolean;
+}
+
+interface FirebaseLoginResponse {
+    message?: string;
+    user?: any;
+    errors?: Record<string, string[]>;
+}
 
 interface Category {
-    category_id: number;
-    name: string;
-    image_url: string;
-    subcategories: {
-        subcategory_id: number;
-        name: string;
-        image_url: string;
-    }[];
-}
-
-interface QuickQuestion {
     id: number;
-    question: string;
-    relatedServices: {
-        categoryId: number;
-        subcategoryIds: number[];
-    };
+    name: string;
+    image: string;
+    subcategories: Array<{
+        id: number;
+        name: string;
+        image: string;
+    }>;
 }
 
-interface WelcomeProps extends PageProps {
-    appInfo?: {
-        canLogin: boolean;
-        canRegister: boolean;
-        laravelVersion: string | null;
-        phpVersion: string | null;
+interface Props {
+    authUser: {
+        user: User | null;
     };
+    currentRoute?: string;
 }
 
-export default function MobileWelcome({ auth, appInfo = { canLogin: false, canRegister: false, laravelVersion: null, phpVersion: null } }: WelcomeProps) {
-    const [selectedQuestion, setSelectedQuestion] = useState<number | null>(null);
+export default function Mobile({ authUser, currentRoute }: Props) {
+    const [isLoading, setIsLoading] = useState(false);
+    const { data, setData, setError, processing, errors } = useForm<LoginFormData>({
+        email: '',
+        password: '',
+        remember: false,
+    });
 
-    const quickQuestions: QuickQuestion[] = [
-        {
-            id: 1,
-            question: "Do you want to clean house?",
-            relatedServices: {
-                categoryId: 1, // Home Services
-                subcategoryIds: [3] // Cleaning
-            }
-        },
-        {
-            id: 2,
-            question: "Do you want to hire a music player?",
-            relatedServices: {
-                categoryId: 2, // Event Services
-                subcategoryIds: [4, 5] // Photography, Catering (example)
-            }
-        },
-        {
-            id: 3,
-            question: "Are you looking for a Venue to host an event?",
-            relatedServices: {
-                categoryId: 2, // Event Services
-                subcategoryIds: [6] // Event Planning
-            }
-        },
-        {
-            id: 4,
-            question: "Are you looking to rent music instruments?",
-            relatedServices: {
-                categoryId: 3, // Equipment Rentals
-                subcategoryIds: [8] // Event Equipment
-            }
+    const googleProvider = new GoogleAuthProvider();
+    googleProvider.addScope('profile');
+    googleProvider.addScope('email');
+    googleProvider.setCustomParameters({
+        prompt: 'select_account'
+    });
+
+    const handleFirebaseError = (error: AuthError) => {
+        console.error('Firebase error:', error);
+        switch (error.code) {
+            case 'auth/invalid-email':
+                setError('email', 'The email address is invalid.');
+                break;
+            case 'auth/user-disabled':
+                setError('email', 'This account has been disabled.');
+                break;
+            case 'auth/user-not-found':
+                setError('email', 'No account found with this email.');
+                break;
+            case 'auth/wrong-password':
+                setError('password', 'Incorrect password.');
+                break;
+            case 'auth/popup-closed-by-user':
+                setError('email', 'Sign-in popup was closed before completion.');
+                break;
+            default:
+                setError('email', `Authentication error: ${error.message}`);
         }
-    ];
+    };
+
+    const handleBackendError = (error: AxiosError<FirebaseLoginResponse>) => {
+        console.error('Backend error:', error.response?.data);
+        const message = error.response?.data?.message || 
+            error.response?.data?.errors?.token?.[0] || 
+            error.message;
+        setError('email', `Server error: ${message}`);
+    };
+
+    const handleEmailLogin: FormEventHandler = async (e) => {
+        e.preventDefault();
+        setIsLoading(true);
+
+        try {
+            const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+            const token = await userCredential.user.getIdToken(true);
+            
+            try {
+                await axios.post('/firebase-login', { token });
+                router.visit('/dashboard');
+            } catch (error) {
+                handleBackendError(error as AxiosError<FirebaseLoginResponse>);
+            }
+        } catch (error) {
+            handleFirebaseError(error as AuthError);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleGoogleLogin = async () => {
+        setIsLoading(true);
+
+        try {
+            const result = await signInWithPopup(auth, googleProvider);
+            const token = await result.user.getIdToken(true);
+            
+            try {
+                await axios.post('/firebase-login', { token });
+                router.visit('/dashboard');
+            } catch (error) {
+                handleBackendError(error as AxiosError<FirebaseLoginResponse>);
+            }
+        } catch (error) {
+            handleFirebaseError(error as AuthError);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const categories: Category[] = [
         {
-            category_id: 1,
-            name: "Home Services",
-            image_url: "/images/home_services.jpg",
+            id: 1,
+            name: "Cleaning",
+            image: "/images/categories/cleaning.jpg",
             subcategories: []
         },
         {
-            category_id: 2,
-            name: "Event Services",
-            image_url: "/images/event_services.jpg",
+            id: 2,
+            name: "Plumbing",
+            image: "/images/categories/plumbing.jpg",
             subcategories: []
         },
         {
-            category_id: 3,
-            name: "Equipment Rentals",
-            image_url: "/images/equipment_rentals.jpg",
+            id: 3,
+            name: "Electrical",
+            image: "/images/categories/electrical.jpg",
             subcategories: []
         },
         {
-            category_id: 4,
-            name: "Personal Services",
-            image_url: "/images/personal_services.jpg",
+            id: 4,
+            name: "Home Improvement",
+            image: "/images/categories/home-improvement.jpg",
             subcategories: []
+        }
+    ];
+
+    const questions = [
+        {
+            id: 1,
+            text: "Need your house cleaned?",
+            relatedServices: [1]
+        },
+        {
+            id: 2,
+            text: "Having plumbing issues?",
+            relatedServices: [2]
+        },
+        {
+            id: 3,
+            text: "Electrical problems?",
+            relatedServices: [3]
+        },
+        {
+            id: 4,
+            text: "Want to improve your home?",
+            relatedServices: [4]
         }
     ];
 
     return (
-        <>
-            <Head title="Welcome to Halluapp" />
-            <div className="block min-h-screen bg-[#bce7f8] md:hidden">
-                <div className="px-4 py-8">
-                    {/* Header */}
-                    <div className="mb-8">
-                        <div className="flex justify-center mb-4">
-                            <h1 className="text-3xl font-bold text-[#3da0ff]">Halluapp</h1>
-                        </div>
-                        {!auth.user && (
-                            <div className="flex justify-center space-x-4">
-                                {appInfo.canLogin && (
-                                    <Link
-                                        href="/login"
-                                        className="rounded-md bg-[#3da0ff] px-6 py-2.5 text-sm font-medium text-white shadow-lg transition hover:bg-[#3da0ff]/90"
-                                    >
-                                        Log in
-                                    </Link>
-                                )}
-                                {appInfo.canRegister && (
-                                    <Link
-                                        href="/register"
-                                        className="rounded-md bg-[#fffad0] px-6 py-2.5 text-sm font-medium text-[#3da0ff] shadow-lg transition hover:bg-[#fffad0]/90"
-                                    >
-                                        Register
-                                    </Link>
-                                )}
-                            </div>
-                        )}
-                    </div>
+        <div className="min-h-screen bg-[#bce7f8]">
+            <Head title="Welcome" />
 
-                    {/* Main Content - Flexbox Layout */}
-                    <div className="flex flex-wrap gap-4 mb-8">
-                        {/* 3 Small Boxes */}
-                        {categories.slice(0, 3).map((category) => (
-                            <Link
-                                key={category.category_id}
-                                href={`/categories/${category.category_id}`}
-                                className="w-[calc(50%-8px)] rounded-2xl bg-white p-4 shadow-xl transition hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98]"
-                            >
-                                <div className="aspect-square w-full bg-[#fffad0] rounded-xl mb-4">
-                                    <img
-                                        src={category.image_url}
-                                        alt={category.name}
-                                        className="h-full w-full object-cover rounded-xl"
-                                    />
-                                </div>
-                                <h3 className="font-bold text-[#3da0ff]">{category.name}</h3>
-                            </Link>
-                        ))}
-
-                        {/* Large Box */}
+            <div className="p-6">
+                {/* Categories Grid */}
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                    {categories.slice(0, 3).map((category) => (
                         <Link
-                            href={`/categories/${categories[3].category_id}`}
-                            className="w-full rounded-2xl bg-white p-4 shadow-xl transition hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98]"
+                            key={category.id}
+                            href={`/subcategories/${category.id}`}
+                            className="aspect-square bg-white rounded-lg shadow-md overflow-hidden"
                         >
-                            <div className="aspect-video w-full bg-[#fffad0] rounded-xl mb-4">
-                                <img
-                                    src={categories[3].image_url}
-                                    alt={categories[3].name}
-                                    className="h-full w-full object-cover rounded-xl"
-                                />
+                            <div className="h-3/4 bg-[#fffad0]">
+                                {/* Image placeholder */}
                             </div>
-                            <h3 className="text-xl font-bold text-[#3da0ff]">{categories[3].name}</h3>
-                            <p className="mt-2 text-sm text-gray-600">
-                                Discover our wide range of personal services tailored to your needs
-                            </p>
+                            <div className="h-1/4 flex items-center justify-center text-[#3da0ff] font-semibold">
+                                {category.name}
+                            </div>
                         </Link>
-                    </div>
+                    ))}
+                
+                </div>
 
-                    {/* Quick Questions Section */}
-                    <div className="mb-8">
-                        <h2 className="text-lg font-semibold text-[#3da0ff] mb-4">Need help finding a service?</h2>
-                        <div className="space-y-3">
-                            {quickQuestions.map((q) => (
-                                <div
-                                    key={q.id}
-                                    className={`bg-white rounded-xl p-4 shadow-lg transition ${
-                                        selectedQuestion === q.id ? 'ring-2 ring-[#3da0ff]' : ''
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-gray-700">{q.question}</p>
-                                        <Link
-                                            href={`/categories/${q.relatedServices.categoryId}?highlight=${q.relatedServices.subcategoryIds.join(',')}`}
-                                            className="ml-4 px-4 py-2 bg-[#3da0ff] text-white rounded-lg text-sm font-medium shadow-md hover:bg-[#3da0ff]/90 transition"
-                                            onClick={() => setSelectedQuestion(q.id)}
-                                        >
-                                            Yes
-                                        </Link>
-                                    </div>
-                                </div>
-                            ))}
+                {/* Login Form */}
+                <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+                    <form onSubmit={handleEmailLogin} className="space-y-4">
+                        <div>
+                            <InputLabel htmlFor="email" value="Email" />
+                            <TextInput
+                                id="email"
+                                type="email"
+                                name="email"
+                                value={data.email}
+                                className="mt-1 block w-full"
+                                autoComplete="username"
+                                onChange={(e) => setData('email', e.target.value)}
+                                disabled={isLoading}
+                                required
+                            />
+                            <InputError message={errors.email} className="mt-2" />
                         </div>
-                    </div>
 
-                    {/* Footer */}
-                    <footer className="mt-8 text-center text-sm text-[#3da0ff]">
-                        <p>Find the perfect service for your needs</p>
-                    </footer>
+                        <div>
+                            <InputLabel htmlFor="password" value="Password" />
+                            <TextInput
+                                id="password"
+                                type="password"
+                                name="password"
+                                value={data.password}
+                                className="mt-1 block w-full"
+                                autoComplete="current-password"
+                                onChange={(e) => setData('password', e.target.value)}
+                                disabled={isLoading}
+                                required
+                            />
+                            <InputError message={errors.password} className="mt-2" />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <Link
+                                href="/register"
+                                className="text-sm text-[#3da0ff] hover:underline"
+                            >
+                                Need an account?
+                            </Link>
+
+                            <PrimaryButton 
+                                className="bg-[#3da0ff]" 
+                                disabled={isLoading || processing}
+                                type="submit"
+                            >
+                                {isLoading ? 'Signing in...' : 'Sign in'}
+                            </PrimaryButton>
+                        </div>
+
+                        <div className="relative my-4">
+                            <div className="absolute inset-0 flex items-center">
+                                <div className="w-full border-t border-gray-300" />
+                            </div>
+                            <div className="relative flex justify-center text-sm">
+                                <span className="bg-white px-2 text-gray-500">Or continue with</span>
+                            </div>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={handleGoogleLogin}
+                            disabled={isLoading}
+                            className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
+                                <path
+                                    d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032 s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2 C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"
+                                    fill="currentColor"
+                                />
+                            </svg>
+                            {isLoading ? 'Signing in...' : 'Sign in with Google'}
+                        </button>
+                    </form>
+                </div>
+
+                {/* Quick Questions */}
+                <div className="space-y-4">
+                    {questions.map((question) => (
+                        <Link
+                            key={question.id}
+                            href={`/subcategories/${question.relatedServices[0]}?highlight=${question.relatedServices.join(',')}`}
+                            className="block w-full"
+                        >
+                            <button
+                                className="w-full bg-white text-[#3da0ff] px-4 py-3 rounded-lg shadow-md hover:bg-gray-50 transition-colors"
+                            >
+                                {question.text}
+                            </button>
+                        </Link>
+                    ))}
                 </div>
             </div>
-        </>
+        </div>
     );
 } 

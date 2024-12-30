@@ -1,18 +1,31 @@
-import { useEffect, FormEventHandler } from 'react';
-import Checkbox from '@/Components/Checkbox';
+import { FormEventHandler, useState } from 'react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { auth } from '@/config/firebase';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, AuthError } from 'firebase/auth';
+import axios, { AxiosError } from 'axios';
+import { router } from '@inertiajs/react';
+
 import GuestLayout from '@/Layouts/GuestLayout';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { auth } from '@/config/firebase';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import axios from 'axios';
-import { router } from '@inertiajs/react';
 
-export default function Login({ status, canResetPassword }: { status?: string, canResetPassword: boolean }) {
-    const { data, setData, setError, processing, errors } = useForm({
+interface LoginFormData {
+    email: string;
+    password: string;
+    remember: boolean;
+}
+
+interface FirebaseLoginResponse {
+    message?: string;
+    user?: any;
+    errors?: Record<string, string[]>;
+}
+
+export default function Login() {
+    const [isLoading, setIsLoading] = useState(false);
+    const { data, setData, setError, processing, errors } = useForm<LoginFormData>({
         email: '',
         password: '',
         remember: false,
@@ -25,31 +38,75 @@ export default function Login({ status, canResetPassword }: { status?: string, c
         prompt: 'select_account'
     });
 
+    const handleFirebaseError = (error: AuthError) => {
+        console.error('Firebase error:', error);
+        switch (error.code) {
+            case 'auth/invalid-email':
+                setError('email', 'The email address is invalid.');
+                break;
+            case 'auth/user-disabled':
+                setError('email', 'This account has been disabled.');
+                break;
+            case 'auth/user-not-found':
+                setError('email', 'No account found with this email.');
+                break;
+            case 'auth/wrong-password':
+                setError('password', 'Incorrect password.');
+                break;
+            case 'auth/popup-closed-by-user':
+                setError('email', 'Sign-in popup was closed before completion.');
+                break;
+            default:
+                setError('email', `Authentication error: ${error.message}`);
+        }
+    };
+
+    const handleBackendError = (error: AxiosError<FirebaseLoginResponse>) => {
+        console.error('Backend error:', error.response?.data);
+        const message = error.response?.data?.message || 
+            error.response?.data?.errors?.token?.[0] || 
+            error.message;
+        setError('email', `Server error: ${message}`);
+    };
+
     const handleEmailLogin: FormEventHandler = async (e) => {
         e.preventDefault();
-        
+        setIsLoading(true);
+
         try {
             const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
             const token = await userCredential.user.getIdToken(true);
-            await axios.post('/firebase-login', { token });
-            router.visit('/dashboard');
-        } catch (error: any) {
-            if (error.code === 'auth/invalid-credential') {
-                setError('email', 'Invalid email or password.');
-            } else {
-                setError('email', 'Login failed. Please try again.');
+            
+            try {
+                await axios.post('/firebase-login', { token });
+                router.visit('/dashboard');
+            } catch (error) {
+                handleBackendError(error as AxiosError<FirebaseLoginResponse>);
             }
+        } catch (error) {
+            handleFirebaseError(error as AuthError);
+        } finally {
+            setIsLoading(false);
         }
     };
 
     const handleGoogleLogin = async () => {
+        setIsLoading(true);
+
         try {
             const result = await signInWithPopup(auth, googleProvider);
             const token = await result.user.getIdToken(true);
-            await axios.post('/firebase-login', { token });
-            router.visit('/dashboard');
+            
+            try {
+                await axios.post('/firebase-login', { token });
+                router.visit('/dashboard');
+            } catch (error) {
+                handleBackendError(error as AxiosError<FirebaseLoginResponse>);
+            }
         } catch (error) {
-            setError('email', 'Google sign-in failed. Please try again.');
+            handleFirebaseError(error as AuthError);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -57,12 +114,9 @@ export default function Login({ status, canResetPassword }: { status?: string, c
         <GuestLayout>
             <Head title="Log in" />
 
-            {status && <div className="mb-4 font-medium text-sm text-green-600">{status}</div>}
-
-            <form onSubmit={handleEmailLogin}>
+            <form onSubmit={handleEmailLogin} className="space-y-6">
                 <div>
                     <InputLabel htmlFor="email" value="Email" />
-
                     <TextInput
                         id="email"
                         type="email"
@@ -70,16 +124,15 @@ export default function Login({ status, canResetPassword }: { status?: string, c
                         value={data.email}
                         className="mt-1 block w-full"
                         autoComplete="username"
-                        isFocused={true}
                         onChange={(e) => setData('email', e.target.value)}
+                        disabled={isLoading}
+                        required
                     />
-
                     <InputError message={errors.email} className="mt-2" />
                 </div>
 
                 <div className="mt-4">
                     <InputLabel htmlFor="password" value="Password" />
-
                     <TextInput
                         id="password"
                         type="password"
@@ -88,34 +141,26 @@ export default function Login({ status, canResetPassword }: { status?: string, c
                         className="mt-1 block w-full"
                         autoComplete="current-password"
                         onChange={(e) => setData('password', e.target.value)}
+                        disabled={isLoading}
+                        required
                     />
-
                     <InputError message={errors.password} className="mt-2" />
                 </div>
 
-                <div className="block mt-4">
-                    <label className="flex items-center">
-                        <Checkbox
-                            name="remember"
-                            checked={data.remember}
-                            onChange={(e) => setData('remember', e.target.checked)}
-                        />
-                        <span className="ms-2 text-sm text-gray-600">Remember me</span>
-                    </label>
-                </div>
+                <div className="mt-4 flex items-center justify-end">
+                    <Link
+                        href="/register"
+                        className="rounded-md text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                    >
+                        Need an account?
+                    </Link>
 
-                <div className="flex items-center justify-end mt-4">
-                    {canResetPassword && (
-                        <Link
-                            href="/forgot-password"
-                            className="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                        >
-                            Forgot your password?
-                        </Link>
-                    )}
-
-                    <PrimaryButton className="ms-4" disabled={processing}>
-                        Log in
+                    <PrimaryButton 
+                        className="ms-4" 
+                        disabled={isLoading || processing}
+                        type="submit"
+                    >
+                        {isLoading ? 'Signing in...' : 'Sign in'}
                     </PrimaryButton>
                 </div>
 
@@ -133,7 +178,8 @@ export default function Login({ status, canResetPassword }: { status?: string, c
                         <button
                             type="button"
                             onClick={handleGoogleLogin}
-                            className="flex w-full justify-center rounded-md bg-white px-4 py-2 text-gray-500 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0"
+                            disabled={isLoading}
+                            className="flex w-full justify-center rounded-md bg-white px-4 py-2 text-gray-500 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <svg className="h-5 w-5" viewBox="0 0 24 24">
                                 <path
@@ -141,7 +187,7 @@ export default function Login({ status, canResetPassword }: { status?: string, c
                                     fill="currentColor"
                                 />
                             </svg>
-                            <span className="ml-2">Sign in with Google</span>
+                            <span className="ml-2">{isLoading ? 'Signing in...' : 'Sign in with Google'}</span>
                         </button>
                     </div>
                 </div>

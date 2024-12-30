@@ -1,17 +1,32 @@
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useState } from 'react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { auth } from '@/config/firebase';
+import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, AuthError } from 'firebase/auth';
+import axios, { AxiosError } from 'axios';
+import { router } from '@inertiajs/react';
+
 import GuestLayout from '@/Layouts/GuestLayout';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import TextInput from '@/Components/TextInput';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { auth } from '@/config/firebase';
-import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import axios from 'axios';
-import { router } from '@inertiajs/react';
+
+interface RegisterFormData {
+    name: string;
+    email: string;
+    password: string;
+    password_confirmation: string;
+}
+
+interface FirebaseLoginResponse {
+    message?: string;
+    user?: any;
+    errors?: Record<string, string[]>;
+}
 
 export default function Register() {
-    const { data, setData, setError, processing, errors } = useForm({
+    const [isLoading, setIsLoading] = useState(false);
+    const { data, setData, setError, processing, errors } = useForm<RegisterFormData>({
         name: '',
         email: '',
         password: '',
@@ -25,6 +40,37 @@ export default function Register() {
         prompt: 'select_account'
     });
 
+    const handleFirebaseError = (error: AuthError) => {
+        console.error('Firebase error:', error);
+        switch (error.code) {
+            case 'auth/email-already-in-use':
+                setError('email', 'This email is already registered.');
+                break;
+            case 'auth/invalid-email':
+                setError('email', 'The email address is invalid.');
+                break;
+            case 'auth/operation-not-allowed':
+                setError('email', 'Email/password accounts are not enabled. Please contact support.');
+                break;
+            case 'auth/weak-password':
+                setError('password', 'The password is too weak.');
+                break;
+            case 'auth/popup-closed-by-user':
+                setError('email', 'Sign-up popup was closed before completion.');
+                break;
+            default:
+                setError('email', `Authentication error: ${error.message}`);
+        }
+    };
+
+    const handleBackendError = (error: AxiosError<FirebaseLoginResponse>) => {
+        console.error('Backend error:', error.response?.data);
+        const message = error.response?.data?.message || 
+            error.response?.data?.errors?.token?.[0] || 
+            error.message;
+        setError('email', `Server error: ${message}`);
+    };
+
     const handleEmailRegister: FormEventHandler = async (e) => {
         e.preventDefault();
         
@@ -33,28 +79,47 @@ export default function Register() {
             return;
         }
 
+        setIsLoading(true);
+
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
             const token = await userCredential.user.getIdToken(true);
-            await axios.post('/firebase-login', { token });
-            router.visit('/dashboard');
-        } catch (error: any) {
-            if (error.code === 'auth/email-already-in-use') {
-                setError('email', 'This email is already registered.');
-            } else {
-                setError('email', 'Registration failed. Please try again.');
+            
+            try {
+                await axios.post('/firebase-login', {
+                    token,
+                    name: data.name,
+                    email: data.email
+                });
+                
+                router.visit('/dashboard');
+            } catch (error) {
+                handleBackendError(error as AxiosError<FirebaseLoginResponse>);
             }
+        } catch (error) {
+            handleFirebaseError(error as AuthError);
+        } finally {
+            setIsLoading(false);
         }
     };
 
     const handleGoogleRegister = async () => {
+        setIsLoading(true);
+
         try {
             const result = await signInWithPopup(auth, googleProvider);
             const token = await result.user.getIdToken(true);
-            await axios.post('/firebase-login', { token });
-            router.visit('/dashboard');
+            
+            try {
+                await axios.post<FirebaseLoginResponse>('/firebase-login', { token });
+                router.visit('/dashboard');
+            } catch (error) {
+                handleBackendError(error as AxiosError<FirebaseLoginResponse>);
+            }
         } catch (error) {
-            setError('email', 'Google sign-up failed. Please try again.');
+            handleFirebaseError(error as AuthError);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -62,27 +127,24 @@ export default function Register() {
         <GuestLayout>
             <Head title="Register" />
 
-            <form onSubmit={handleEmailRegister}>
+            <form onSubmit={handleEmailRegister} className="space-y-6">
                 <div>
                     <InputLabel htmlFor="name" value="Name" />
-
                     <TextInput
                         id="name"
                         name="name"
                         value={data.name}
                         className="mt-1 block w-full"
                         autoComplete="name"
-                        isFocused={true}
                         onChange={(e) => setData('name', e.target.value)}
+                        disabled={isLoading}
                         required
                     />
-
                     <InputError message={errors.name} className="mt-2" />
                 </div>
 
                 <div className="mt-4">
                     <InputLabel htmlFor="email" value="Email" />
-
                     <TextInput
                         id="email"
                         type="email"
@@ -91,15 +153,14 @@ export default function Register() {
                         className="mt-1 block w-full"
                         autoComplete="username"
                         onChange={(e) => setData('email', e.target.value)}
+                        disabled={isLoading}
                         required
                     />
-
                     <InputError message={errors.email} className="mt-2" />
                 </div>
 
                 <div className="mt-4">
                     <InputLabel htmlFor="password" value="Password" />
-
                     <TextInput
                         id="password"
                         type="password"
@@ -108,18 +169,14 @@ export default function Register() {
                         className="mt-1 block w-full"
                         autoComplete="new-password"
                         onChange={(e) => setData('password', e.target.value)}
+                        disabled={isLoading}
                         required
                     />
-
                     <InputError message={errors.password} className="mt-2" />
                 </div>
 
                 <div className="mt-4">
-                    <InputLabel
-                        htmlFor="password_confirmation"
-                        value="Confirm Password"
-                    />
-
+                    <InputLabel htmlFor="password_confirmation" value="Confirm Password" />
                     <TextInput
                         id="password_confirmation"
                         type="password"
@@ -127,16 +184,11 @@ export default function Register() {
                         value={data.password_confirmation}
                         className="mt-1 block w-full"
                         autoComplete="new-password"
-                        onChange={(e) =>
-                            setData('password_confirmation', e.target.value)
-                        }
+                        onChange={(e) => setData('password_confirmation', e.target.value)}
+                        disabled={isLoading}
                         required
                     />
-
-                    <InputError
-                        message={errors.password_confirmation}
-                        className="mt-2"
-                    />
+                    <InputError message={errors.password_confirmation} className="mt-2" />
                 </div>
 
                 <div className="mt-4 flex items-center justify-end">
@@ -147,8 +199,12 @@ export default function Register() {
                         Already registered?
                     </Link>
 
-                    <PrimaryButton className="ms-4" disabled={processing}>
-                        Register
+                    <PrimaryButton 
+                        className="ms-4" 
+                        disabled={isLoading || processing}
+                        type="submit"
+                    >
+                        {isLoading ? 'Creating account...' : 'Register'}
                     </PrimaryButton>
                 </div>
 
@@ -166,7 +222,8 @@ export default function Register() {
                         <button
                             type="button"
                             onClick={handleGoogleRegister}
-                            className="flex w-full justify-center rounded-md bg-white px-4 py-2 text-gray-500 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0"
+                            disabled={isLoading}
+                            className="flex w-full justify-center rounded-md bg-white px-4 py-2 text-gray-500 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             <svg className="h-5 w-5" viewBox="0 0 24 24">
                                 <path
@@ -174,7 +231,7 @@ export default function Register() {
                                     fill="currentColor"
                                 />
                             </svg>
-                            <span className="ml-2">Sign up with Google</span>
+                            <span className="ml-2">{isLoading ? 'Creating account...' : 'Sign up with Google'}</span>
                         </button>
                     </div>
                 </div>
